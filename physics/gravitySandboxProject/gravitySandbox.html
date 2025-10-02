@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gravity Sandbox</title>
+  <style>
+    body {
+      background: #111;
+      color: #eee;
+      font-family: Arial, sans-serif;
+      text-align: center;
+    }
+    canvas {
+      border: 1px solid #555;
+      background: black;
+      display: block;
+      margin: auto;
+    }
+    #controls {
+      margin: 10px;
+    }
+    label {
+      margin: 0 10px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Gravity Sandbox</h1>
+  <p>Click to add planets. Adjust gravity and watch chaos unfold.</p>
+  
+  <div id="controls">
+    <label>Gravity: 
+      <input type="range" id="gravitySlider" min="0.1" max="2" step="0.1" value="0.5">
+    </label>
+    <button id="pauseBtn">Pause</button>
+    <button id="clearBtn">Clear</button>
+  </div>
+  
+  <canvas id="sim" width="800" height="600"></canvas>
+  
+<script>
+const canvas = document.getElementById("sim");
+const ctx = canvas.getContext("2d");
+const gravitySlider = document.getElementById("gravitySlider");
+const pauseBtn = document.getElementById("pauseBtn");
+const clearBtn = document.getElementById("clearBtn");
+
+class Body {
+  constructor(x, y, vx, vy, mass, color) {
+    this.x = x; this.y = y;
+    this.vx = vx; this.vy = vy;
+    this.mass = mass; 
+    this.color = color;
+    this.radius = Math.max(4, Math.sqrt(mass)/2);
+    this.trail = [];
+  }
+  update(forces, dt) {
+    this.vx += forces.x / this.mass * dt;
+    this.vy += forces.y / this.mass * dt;
+    this.x += this.vx * dt;
+    this.y += this.vy * dt;
+    
+    this.trail.push({x:this.x, y:this.y});
+    if (this.trail.length > 80) this.trail.shift();
+  }
+  draw() {
+    
+    ctx.beginPath();
+    for (let i=0; i<this.trail.length; i++) {
+      let p = this.trail[i];
+      ctx.lineTo(p.x, p.y);
+    }
+    ctx.strokeStyle = this.color + "88";
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.radius, 0, Math.PI*2);
+    ctx.fillStyle = this.color;
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = this.color;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+}
+
+let G = parseFloat(gravitySlider.value);
+let bodies = [
+  new Body(400, 300, 0, 0, 3000, "yellow"),
+  new Body(600, 300, 0, 2.5, 15, "cyan"),
+];
+
+let paused = false;
+
+function loop() {
+  if (!paused) {
+    ctx.fillStyle = "rgba(0,0,0,0.3)";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+
+    bodies.forEach((b, i) => {
+      let fx = 0, fy = 0;
+      bodies.forEach((other, j) => {
+        if (i !== j) {
+          let dx = other.x - b.x;
+          let dy = other.y - b.y;
+          let dist = Math.sqrt(dx*dx + dy*dy);
+          if (dist < b.radius + other.radius) {
+          
+            if (b.mass > other.mass) {
+              b.mass += other.mass;
+              b.radius = Math.sqrt(b.mass)/2;
+              bodies.splice(j,1);
+            }
+          } else {
+            let f = G * b.mass * other.mass / (dist*dist);
+            fx += f * dx/dist;
+            fy += f * dy/dist;
+          }
+        }
+      });
+      b.update({x:fx, y:fy}, 0.5);
+      b.draw();
+    });
+  }
+  requestAnimationFrame(loop);
+}
+loop();
+
+
+gravitySlider.addEventListener("input", e => {
+  G = parseFloat(e.target.value);
+});
+pauseBtn.addEventListener("click", () => {
+  paused = !paused;
+  pauseBtn.textContent = paused ? "Resume" : "Pause";
+});
+clearBtn.addEventListener("click", () => {
+  bodies = [];
+});
+
+
+canvas.addEventListener("click", (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  const mass = Math.random()*30+5;
+  const color = `hsl(${Math.random()*360}, 80%, 60%)`;
+  const vx = (Math.random()-0.5)*4;
+  const vy = (Math.random()-0.5)*4;
+  bodies.push(new Body(x,y,vx,vy,mass,color));
+});
+</script>
+</body>
+</html>
